@@ -1,0 +1,4 @@
+Param,Value
+x_field,YEAR_BUILT
+y_field ,ASSESSED_V
+outfile,scatterplot_YearBuilt_vs_Assessed_Values.png

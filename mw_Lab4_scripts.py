@@ -1,9 +1,16 @@
 import arcpy
 import pandas as pd
 import matplotlib.pyplot as plt
-import Lab4_functions as l4
+import msw_Lab4_functions as l4
 import importlib
 
+import os
+print(os.getcwd())
+
+import os
+os.chdir("R:/2025/Spring/GEOG562/Students/whitehom/Lab_4/PythonCode")
+
+import msw_Lab4_functions as l4
 
 
 # Block 1:  set up github
@@ -24,7 +31,7 @@ import importlib
 #   
 # Set the workspace to point to the geodatabase you are using for this lab
 
-arcpy.env.workspace = r"R:\2025\Spring\GEOG562\Instructors\kennedy_2025\Lab4\Lab4_arcproject_REK\Lab4_arcproject_REK.gdb" 
+arcpy.env.workspace = r"R:\2025\Spring\GEOG562\Students\whitehom\Lab_4\lab4_arcproject_mw\lab4_arcproject_mw.gdb" 
 
 ############################################################################
 # Block 3:  We are going to work with the notion of extending raster objects
@@ -39,15 +46,21 @@ importlib.reload(l4)
 #  it works.  Point to the Landsat_image_corv raster, and print out the 
 #   coordinate bounds of the raster
 
-r = l4.SmartRaster("Landsat_image_corv")
-print(r.metadata["bounds"])
+try:
+    r = l4.SmartRaster("Landsat_image_corv")
+    print(r.metadata["bounds"])
+except Exception as e:
+    print("Failed to create SmartRaster object:", e)
 
+
+print(arcpy.env.workspace)
 
 # Question 1
 #  Why do we need to use the "super()" function in the definition of the SmartRaster?
 
 # Your answer:
-
+# The super() function allows SmartRaster to inherit all the functionality of the base arcpy.Raster class.
+# So using super() ensures the underlying raster structure and metadata are properly initialized
 
 
 
@@ -67,24 +80,48 @@ print(r.metadata["bounds"])
 #       The method should return a tuple with the okay, NDVI_object
 
 #  Again, you'll need to add code to the calculate_ndvi function
+import importlib
+importlib.reload(l4)
 
-okay, ndvi = r.calculate_ndvi()
+import importlib
+import msw_Lab4_functions as l4
+importlib.reload(l4)
+import arcpy
+from arcpy import sa  # Make sure to import Spatial Analyst module
+
+print(f"Band Count: {r.bandCount}")
+for i in range(1, r.bandCount + 1):
+    band = sa.Raster(r.raster_path + f"/Band_{i}")
+    print(f"Band {i}: {band}")
+
+
+import arcpy
+r = l4.SmartRaster("Landsat_image_corv")
+print('calculate_ndvi' in dir(r))  # This must print: True
+
+try:
+    okay, ndvi = r.calculate_ndvi()
+    print(f"Debug: okay={okay}, ndvi={ndvi}")
+except AttributeError:
+    print("Error: 'calculate_ndvi' method is not defined for the object 'l4'.")
+    okay, ndvi = False, None
 
 # Assuming this is okay, write it to a new raster that we can use later
 out_ndvi_file = "NDVI_corv"
 if okay: 
     print("NDVI calculation successful.")
-    #Check first if the file already exists
+    # Check first if the file already exists
     if arcpy.Exists(out_ndvi_file):
-        print(f"{out_ndvi_file} already exists. ")
+        print(f"{out_ndvi_file} already exists.")
     # Write the NDVI raster to a new file
     try:
         ndvi.save(out_ndvi_file)
-        print(f"{out_ndvi_file}written successfully.")
+        print(f"{out_ndvi_file} written successfully.")
     except Exception as e:
         print(f"Error writing NDVI raster: {e}")    
 else:
     print("NDVI calculation failed.")
+
 
 # Question 4.1 
 #  In the "calculate_ndvi", the method accepts 
@@ -93,6 +130,9 @@ else:
 #    set them here -- why did it work?
 
 #  Your answer:
+# It worked because the calculate_ndvi method includes default values for its two parameters: 
+# band4_index=4 and band3_index=3.
+# Since we didn’t pass any arguments, Python used these defaults automatically.
 
 
 
@@ -120,17 +160,38 @@ else:
 #     field called mean_ndvi
 
 
-importlib.reload(l4)
-fc = "Corvallis_parcels" # remember you should have copied this into your workspace in Block 2.
 
-#Load the fc as a smart vector layer
+import importlib
+import msw_Lab4_functions as l4
+importlib.reload(l4)
+
+importlib.reload(l4)
+
+fc = "Corvallis_parcels_1"  
+out_ndvi_file = "NDVI_corv2" 
+
+# Load the feature class as a smart vector layer
 smart_vector = l4.SmartVectorLayer(fc)
 
-# then get the zonal stats using the mean value
-smart_vector.zonal_stats_to_field(out_ndvi_file, output_field = "NDVI_mean")
+# Perform zonal statistics and write the mean NDVI values to a new field
+smart_vector.zonal_stats_to_field(out_ndvi_file, output_field="NDVI_mean")
 
-# then save it as a new feature class!
-smart_vector.save_as("Corvallis_parcels_plusNDVI")
+# Save the updated feature class as a new file
+smart_vector.save_as("Corvallis_parcels_plusNDVI5")
+
+
+zonal_table = "in_memory/zonal_stats"
+
+# Print the field names in the zonal table
+zonal_fields = [f.name for f in arcpy.ListFields(zonal_table)]
+print("Zonal table fields:", zonal_fields)
+
+# Print the first few MEAN values from the zonal table
+with arcpy.da.SearchCursor(zonal_table, ["MEAN"]) as cursor:
+    for i, row in enumerate(cursor):
+        print(f"Row {i}: MEAN = {row[0]}")
+        if i > 10:
+            break
 
 
 # Question 5.1
@@ -141,9 +202,13 @@ smart_vector.save_as("Corvallis_parcels_plusNDVI")
 #     reasonably?  Any observations or oddities? 
 # 
 
-#Your answer
+#Your answer: Im unsure as to why but everytime I ran the zonal stats it would create the NDVI_mean
+# field but it would be empty. I tried to run it a many diffeent times but it always showed "NULL"
+# This suggests that the join step between the zonal stats table and the feature class failed silently, likely due to mismatched join field names. 
+# Despite extensive troubleshooting, the issue could not be resolved before submission.
 
 
+print([f.name for f in arcpy.ListFields("Corvallis_parcels")])
 
 
 
@@ -159,7 +224,24 @@ smart_vector.save_as("Corvallis_parcels_plusNDVI")
 #  to do.  Most of the functionality is already there
 
 
+from msw_Lab4_functions import SmartVectorLayer  # Import the SmartVectorLayer class
+import arcpy
+arcpy.env.overwriteOutput = True
+
+# Initialize the SmartVectorLayer object with the correct feature class path
+feature_class_path = r"R:\2025\Spring\GEOG562\Students\whitehom\Lab_4\lab4_arcproject_mw\lab4_arcproject_mw.gdb\Corvallis_parcels_plusNDVI1"
+smart_vector = SmartVectorLayer(feature_class_path)
+
+# Extract data into a Pandas DataFrame
 okay, df = smart_vector.extract_to_pandas_df()
+
+# Check if the extraction was successful
+if okay:
+    print("Data successfully extracted to Pandas DataFrame.")
+    print(df.head())  # Display the first few rows of the DataFrame
+else:
+    print("Failed to extract data to Pandas DataFrame.")
+
 
 
 # Question 6.1. 
@@ -168,7 +250,9 @@ okay, df = smart_vector.extract_to_pandas_df()
 #   call to the method, and how do I use it in the
 #   code?  
 
-# Your answer
+# Your answer: The fields=None argument is a default parameter that lets the method behave flexibly. 
+# If the person does not provide a specific list of fields to extract, 
+# the function automatically gathers all non-geometry, non-OID fields.
 
 
 
@@ -204,7 +288,8 @@ sp.scatterplot(x_field, y_field, x_min=1901, x_max = 2030)
 #  
 
 
-# Your answer:
+# Your answer: df_to_plot is a filtered version of the original DataFrame. 
+# The line filters rows to only include those where the x_field value is greater than or equal to x_min. 
 
 
 
@@ -238,7 +323,7 @@ sp.scatterplot(x_field, y_field, x_min=1901, x_max = 2030)
 #   Here, and you have the name of the file for the control file
 #  Below, simply call the "plot_from_file" method to run the .csv fil
 
-param_file = 'params_1.csv'  #  this assumes you've placed in the 
+param_file5 = 'params_5.csv'  #  this assumes you've placed in the 
                             # python code directory you're working in here. 
 # Your code:
 
@@ -246,9 +331,13 @@ param_file = 'params_1.csv'  #  this assumes you've placed in the
 
 #  My code
 
-ok = sp.plot_from_file(param_file)
+ok = sp.plot_from_file(param_file5)
 if ok:
     print("Done plotting")
+else:
+    print("Plotting failed")
+
+print(list(sp.columns))
 
 
 # Now check the output graphic and make sure it worked. 
@@ -266,7 +355,8 @@ if ok:
 #  What will happen if you give it a field that is not
 #    numeric?   How might you make this work better?
 
-# Your answer
+# Your answer: The plot function will likely fail with an error because matplotlib 
+# requires numeric values for both axes in a scatterplot.
 
 
 
@@ -284,7 +374,20 @@ if ok:
 #   Can you describe (in words, no need for code)
 #   how you might achieve that?
 
-# Your answer:
+# Your answer: You could probably generate the output filename 
+# automatically using the x and y field names by concatenating them into the filename.
+# For example, if x is "YEAR_BUILT" and y is "ASSESSED_V", the script could automatically 
+# set the output filename to "YEAR_BUILT_vs_ASSESSED_V.png". 
+# This removes the need for manual naming and keeps files logically labeled
 
 
 
+# Sanity check your raster and vector
+print("NDVI exists?", arcpy.Exists("NDVI_corv1"))
+print("Vector exists?", arcpy.Exists("Corvallis_parcels"))
+print("Feature class fields:", [f.name for f in arcpy.ListFields("Corvallis_parcels")])
+print("NDVI field exists?", "NDVI_mean" in [f.name for f in arcpy.ListFields("Corvallis_parcels")])
+
+# Check spatial reference
+print(arcpy.Describe("NDVI_corv1").spatialReference.name)
+print(arcpy.Describe("Corvallis_parcels").spatialReference.name)
